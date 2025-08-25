@@ -1,74 +1,65 @@
-// supabase/functions/add-voters/index.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
-// Definisikan tipe untuk data yang kita terima
-interface Voter {
-  email: string
-}
-
 Deno.serve(async (req) => {
-  // Menangani preflight request untuk CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { election_id, voters } = await req.json()
-    if (!election_id || !voters) {
-      throw new Error("Election ID and voters list are required.")
+    const { election_id, voters, organization_id } = await req.json(); // Admin harus mengirimkan org_id nya juga
+    if (!election_id || !voters || !organization_id) {
+      throw new Error("Data tidak lengkap.");
     }
 
-    // Buat Admin client yang punya hak akses tinggi
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    // Proses setiap pemilih dalam daftar
     for (const voter of voters) {
-      if (!voter.email) continue;
+      if (!voter.email || !voter.identifier_type || !voter.identifier_value) continue;
 
-      // Cek apakah user sudah ada
-      let { data: userData, error: userError } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('email', voter.email)
-        .single()
+      let { data: userData } = await supabaseAdmin.auth.admin.getUserByEmail(voter.email);
       
-      // Jika user belum ada, undang mereka. Supabase akan mengirim email invite.
-      if (!userData) {
+      if (!userData.user) {
         const { data: newUser, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(voter.email);
-        if (inviteError) {
-          console.warn(`Could not invite user ${voter.email}:`, inviteError.message);
-          continue; // Lanjut ke email berikutnya jika gagal
-        }
-        userData = newUser.user;
+        if (inviteError) { console.warn(`Gagal undang ${voter.email}:`, inviteError.message); continue; }
+        userData.user = newUser.user;
+        
+        // Buat profil HANYA saat user baru pertama kali diundang
+        const { error: profileError } = await supabaseAdmin.from('profiles').insert({
+            id: userData.user.id,
+            email: voter.email,
+            role: 'user',
+            identifier_type: voter.identifier_type,
+            identifier_value: voter.identifier_value,
+            organization_id: organization_id
+        });
+        if(profileError) console.error(`Gagal buat profil ${voter.email}:`, profileError.message);
+
+      } else {
+         // Jika user sudah ada, cukup update profilnya (jika perlu)
+         const { error: profileError } = await supabaseAdmin.from('profiles').update({
+            identifier_type: voter.identifier_type,
+            identifier_value: voter.identifier_value,
+            organization_id: organization_id
+         }).eq('id', userData.user.id);
+         if(profileError) console.error(`Gagal update profil ${voter.email}:`, profileError.message);
       }
       
-      // Daftarkan user ke pemilihan di tabel 'eligible_voters'
-      // 'upsert' akan mencegah duplikat jika user sudah terdaftar sebelumnya
-      const { error: upsertError } = await supabaseAdmin
-        .from('eligible_voters')
-        .upsert({
+      // Daftarkan ke pemilihan
+      const { error: upsertError } = await supabaseAdmin.from('eligible_voters').upsert({
           election_id: election_id,
-          user_id: userData.id,
-          has_voted: false
-        }, { onConflict: 'election_id,user_id' }); // Kunci unik untuk mencegah duplikat
-
-      if (upsertError) {
-        console.error(`Failed to upsert voter ${voter.email}:`, upsertError.message);
-      }
+          user_id: userData.user.id,
+          organization_id: organization_id
+      }, { onConflict: 'election_id,user_id' });
+      if (upsertError) console.error(`Gagal daftar pemilih ${voter.email}:`, upsertError.message);
     }
 
-    return new Response(JSON.stringify({ message: 'Voters processed successfully!' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+    return new Response(JSON.stringify({ message: 'Proses pendaftaran pemilih selesai!' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
     })
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400,
     })
   }
 })

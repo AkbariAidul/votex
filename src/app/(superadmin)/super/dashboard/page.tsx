@@ -23,9 +23,10 @@ export default async function SuperAdminDashboard() {
     if (rpcError) console.error("Error fetching chart data:", rpcError);
 
     // Format data untuk dikirim ke komponen client
+    type MonthlyData = { month_name: string; election_count: number };
     const chartData = {
-        labels: monthlyData?.map(d => d.month_name) || [],
-        values: monthlyData?.map(d => d.election_count) || []
+        labels: (monthlyData as MonthlyData[] | undefined)?.map((d: MonthlyData) => d.month_name) || [],
+        values: (monthlyData as MonthlyData[] | undefined)?.map((d: MonthlyData) => d.election_count) || []
     };
 
     return <DashboardClientUI stats={stats} chartData={chartData} />;

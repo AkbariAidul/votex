@@ -1,7 +1,7 @@
-// src/app/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -12,20 +12,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Tailwind CDN (sudah ada) */}
         <script src="https://cdn.tailwindcss.com"></script>
-        {/* Flowbite CSS CDN (TAMBAHKAN INI) */}
         <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.css" rel="stylesheet" />
       </head>
-      <body className={inter.className}>
-        {children}
-        {/* Flowbite JS CDN (TAMBAHKAN INI) */}
+      <body className={`${inter.className} bg-gray-900 text-white`}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+            {children}
+        </ThemeProvider>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js"></script>
       </body>
     </html>
