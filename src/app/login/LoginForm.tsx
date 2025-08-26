@@ -1,6 +1,6 @@
 "use client";
-import { useActionState, useFormStatus } from "react-dom";
-import { useState, useEffect } from "react";
+import { useActionState, useState, useEffect, useRef } from 'react'; // <-- Import useActionState dari 'react'
+import { useFormStatus } from 'react-dom';                       // <-- Import useFormStatus dari 'react-dom'
 import { smartLogin } from "../auth/actions";
 import Image from "next/image";
 
@@ -18,7 +18,6 @@ export default function LoginForm() {
     const [identifier, setIdentifier] = useState('');
     const isEmail = identifier.includes('@');
 
-    // Reset form jika sukses mengirim link
     const formRef = useRef<HTMLFormElement>(null);
     useEffect(() => {
         if (state?.success) {
@@ -52,7 +51,6 @@ export default function LoginForm() {
                         />
                     </div>
 
-                    {/* Kolom password hanya muncul jika input adalah email */}
                     {isEmail && (
                         <div>
                             <label htmlFor="password" className="block mb-2 text-sm font-medium text-gray-300">Password</label>

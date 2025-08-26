@@ -10,25 +10,19 @@ export default async function LoginPageServer() {
     if (session) {
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
         if (profile) {
-            // PERBAIKAN LOGIKA REDIRECT DI SINI JUGA
             switch (profile.role) {
-                case 'superadmin': 
-                    redirect('/super/dashboard'); 
-                    break;
-                case 'admin': 
-                    redirect('/admin/dashboard'); 
-                    break;
-                case 'user':
-                    redirect('/'); // Jika user sudah login, arahkan ke landing page
+                case 'superadmin': redirect('/super/dashboard'); break;
+                case 'admin': redirect('/admin/dashboard'); break;
+                case 'user':   // <-- PERUBAHAN DI SINI
+                    redirect('/'); 
                     break;
                 default: 
                     redirect('/'); 
                     break;
             }
         } else {
-             redirect('/'); // Fallback jika profil tidak ditemukan
+             redirect('/');
         }
     }
-
     return <LoginForm />;
 }
